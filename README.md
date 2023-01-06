@@ -1,8 +1,6 @@
-# Ulauncher - Translate  (Updated)
+# Ulauncher - Translate  (Updated, Forked)
 
-[![Ulauncher Extension](https://img.shields.io/badge/Ulauncher-Extension-green.svg)](https://github.com/manahter/ulauncher-translate)
-
-> [Translate](https://github.com/manahter/ulauncher-translate)
+This is a fork of [manahter's translation plugin](https://github.com/manahter/ulauncher-translate) for Ulauncher, rewritten to use [`py-googletrans`](https://github.com/ssut/py-googletrans/) as backend (this should be slightly faster) and with some other modifications
 
 ## Preview
 
