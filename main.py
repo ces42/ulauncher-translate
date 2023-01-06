@@ -46,7 +46,7 @@ class KeywordQueryEventListener(EventListener):
         
         if m := re.search(LANG_RE + '$', query) or re.match(LANG_RE, query):
             from_language = m.group(1) or 'auto'
-            to_language = m.group(2) or 'auto'
+            to_language = m.group(2) or extension.preferences["mainlang"]
             if m.start():
                 query = query[:m.start()].strip()
             else:
