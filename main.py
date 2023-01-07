@@ -108,8 +108,6 @@ class KeywordQueryEventListener(EventListener):
         
         items = []
         for result, orig, to, pronunc in tr_list:
-            print(result)
-            print()
             if isinstance(pronunc, str) and pronunc != result and pronunc != query and len(pronunc + result) + 4 <= wrap_len:
                 res_text = f'{result}  "{pronunc}"'
             else:
