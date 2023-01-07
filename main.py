@@ -11,12 +11,13 @@ from ulauncher.api.shared.action.CopyToClipboardAction import CopyToClipboardAct
 import textwrap
 import sys
 import re
-from googletrans import Translator, models
+from googletrans import Translator
+import asyncio
 
 AGENT =  "Mozilla/5.0 (Android 9; Mobile; rv:67.0.3) Gecko/67.0.3 Firefox/67.0.3"
 LANG_RE = '([a-zA-Z]{2})?:([a-zA-Z]{2})?' 
 
-FLAGS = {'en': '🇺🇸', 'de': '🇩🇪', 'es': '🇪🇸', 'zh-cn': '🇨🇳', 'fr': '🇫🇷'}
+FLAGS = {'en': '🇺🇸', 'de': '🇩🇪', 'es': '🇪🇸', 'zh-cn': '🇨🇳', 'fr': '🇫🇷', 'it': '🇮🇹'}
 
 
 class TranslateExtension(Extension):
@@ -25,49 +26,56 @@ class TranslateExtension(Extension):
     def __init__(self):
         super(TranslateExtension, self).__init__()
         self.translator = Translator(user_agent=AGENT)
-        self.subscribe(KeywordQueryEvent, KeywordQueryEventListener(self.translate))
+        self.subscribe(KeywordQueryEvent, KeywordQueryEventListener(self.translate_multi))
+
+    async def async_translate(self, query, to_langs, from_language="auto"):
+        def tr_task(query, to, from_language):
+            return lambda: self.translate(query, to, from_language)
+
+        loop = asyncio.get_running_loop()
+        tasks = []
+        for to in to_langs:
+            tasks.append(loop.run_in_executor(None, tr_task(query, to, from_language)))
+
+        return await asyncio.gather(*tasks)
+
+    def translate(self, query, to_language, from_language="auto"): 
+        res = self.translator.translate(query, src=from_language, dest=to_language)
+        if res.src == res.dest:
+            return []
+        ret = [(res.text, res.src, res.dest, res.pronunciation)]
+        print(to_language, res.dest)
+        print(res.text)
+        try:
+            all_tr = res.extra_data['possible-translations']
+            for x, *_ in all_tr[0][2]:
+                if x != res.text:
+                    ret.append((x, res.src, res.dest, None))
+        except (TypeError, IndexError) as e:
+            print(f"silencing error: {e}")
+            pass
+        return ret
     
-    def translate(self, query, to_list, from_language="auto"):
-        if from_language in to_list and len(to_list) > 1:
-            to_list.remove(from_language)
+    def translate_multi(self, query, to_langs, from_language="auto"):
+        print(to_langs)
+        if from_language in to_langs and len(to_langs) > 1:
+            to_langs.remove(from_language)
 
-        results = [self.translator.translate(query, src=from_language, dest=to_language) for to_language in to_list]
-        results = list(filter(lambda res: res.src != res.dest, results))
+        results = asyncio.run(self.async_translate(query, to_langs, from_language))
 
-        yield from ((res.text, res.src, res.dest, res.pronunciation) for res in results)
-
+        yield from (res[0] for res in results if res)
         for res in results:
-            try:
-                all_tr = res.extra_data['possible-translations']
-                for x, *_ in all_tr[0][2]:
-                    if x != res.text:
-                        yield x, res.src, res.dest, None
-            except (TypeError, IndexError) as e:
-                print(f"silencing error: {e}")
-                pass
-        # return text, result[0].src, result.dest, [res.pronunciation for res in results] + [None] * (len(text) - 1)
+            yield from res[1:]
 
-#     def translate(self, query, to_list, from_language="auto"):
-#         if len(to_list) > 1:
-#             to_list.remove(from_language)
-#         results = [self.translator.translate(query, src=from_language, dest=to_language) for to_language in to_list]
-#         text = [res.text for res in results]
-#         for res in results:
-#             try:
-#                 all_tr = res.extra_data['possible-translations']
-#                 for x, *_ in all_tr[0][2]:
-#                     if x != text[0]:
-#                         text.append(x)
-#             except (TypeError, IndexError):
-#                 pass
-#         return text, result[0].src, result.dest, [res.pronunciation for res in results] + [None] * (len(text) - 1)
-
+def format_query(query, orig, to):
+    return query.replace("\n","") + f'  [{orig + FLAGS.get(orig, "")} → {to + FLAGS.get(to, "")}]'
 
 class KeywordQueryEventListener(EventListener):
     def __init__(self, tr_func):
         self.tr_func = tr_func
 
     def on_event(self, event, extension):
+        tr_func = self.tr_func
         query = event.get_argument() or str()
         
         if len(query.strip()) == 0:
@@ -91,8 +99,12 @@ class KeywordQueryEventListener(EventListener):
         if 'zh' in to_langs:
             to_langs[to_langs.index('zh')] = 'zh-cn'
 
+        if len(to_langs) == 1:
+            to_langs = to_langs[0]
+            tr_func = extension.translate
+
         try:
-            tr_list = list(self.tr_func(query, to_langs, from_language))
+            tr_list = list(tr_func(query, to_langs, from_language))
         except ValueError as e:
             return RenderResultListAction([
                 ExtensionResultItem(icon='images/icon.png',
@@ -115,7 +127,7 @@ class KeywordQueryEventListener(EventListener):
             
             items.append(
                 ExtensionResultItem(icon='images/icon.png',
-                                    name=query.replace("\n","") + f'  [{orig + FLAGS.get(orig, "")} → {to + FLAGS.get(to, "")}]',
+                                    name=format_query(query, orig, to),
                                     description=res_text,
                                     on_enter=CopyToClipboardAction(result))
             )
