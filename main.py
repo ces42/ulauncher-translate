@@ -15,7 +15,7 @@ from googletrans import Translator
 import asyncio
 
 AGENT =  "Mozilla/5.0 (Android 9; Mobile; rv:67.0.3) Gecko/67.0.3 Firefox/67.0.3"
-LANG_RE = '([a-zA-Z]{2})?:([a-zA-Z]{2})?' 
+LANG_RE = '([a-zA-Z-]{2,})?:([a-zA-Z]{2})?' 
 
 FLAGS = {'en': '🇺🇸', 'de': '🇩🇪', 'es': '🇪🇸', 'zh-cn': '🇨🇳', 'fr': '🇫🇷', 'it': '🇮🇹'}
 
@@ -40,12 +40,19 @@ class TranslateExtension(Extension):
         return await asyncio.gather(*tasks)
 
     def translate(self, query, to_language, from_language="auto"): 
-        res = self.translator.translate(query, src=from_language, dest=to_language)
+        try:
+            res = self.translator.translate(query, src=from_language, dest=to_language)
+        except ValueError as e:
+            match str(e):
+                case 'invalid destination language':
+                    e.lang = to_language
+                case 'invalid source language':
+                    e.lang = from_language
+            raise e
+
         if res.src == res.dest:
             return []
         ret = [(res.text, res.src, res.dest, res.pronunciation)]
-        print(to_language, res.dest)
-        print(res.text)
         try:
             all_tr = res.extra_data['possible-translations']
             for x, *_ in all_tr[0][2]:
@@ -57,7 +64,6 @@ class TranslateExtension(Extension):
         return ret
     
     def translate_multi(self, query, to_langs, from_language="auto"):
-        print(to_langs)
         if from_language in to_langs and len(to_langs) > 1:
             to_langs.remove(from_language)
 
@@ -87,7 +93,7 @@ class KeywordQueryEventListener(EventListener):
         
         if m := re.search(LANG_RE + '$', query) or re.match(LANG_RE, query):
             from_language = m.group(1) or 'auto'
-            to_langs= [m.group(2) or extension.preferences["mainlang"]]
+            to_langs= [m.group(2)] if m.group(2) else extension.preferences["mainlang"].split(',')
             if m.start():
                 query = query[:m.start()].strip()
             else:
@@ -106,12 +112,15 @@ class KeywordQueryEventListener(EventListener):
         try:
             tr_list = list(tr_func(query, to_langs, from_language))
         except ValueError as e:
-            return RenderResultListAction([
-                ExtensionResultItem(icon='images/icon.png',
-                                    name=query,
-                                    description=str(e),
-                                    on_enter=HideWindowAction())
-            ])
+            if hasattr(e, 'lang'):
+                return RenderResultListAction([
+                    ExtensionResultItem(icon='images/icon.png',
+                                        name=query,
+                                        description=f"{e} '{e.lang}'",
+                                        on_enter=HideWindowAction())
+                ])
+            else:
+                raise e
 
         try:
             wrap_len = int(extension.preferences['wrap'])
