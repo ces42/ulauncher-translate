@@ -74,7 +74,7 @@ class TranslateExtension(Extension):
             yield from res[1:]
 
 def format_query(query, orig, to):
-    return query.replace("\n","") + f'  [{orig + FLAGS.get(orig, "")} → {to + FLAGS.get(to, "")}]'
+    return query.replace("\n","") + f'  [{orig + FLAGS.get(orig.lower(), "")} → {to + FLAGS.get(to.lower(), "")}]'
 
 class KeywordQueryEventListener(EventListener):
     def __init__(self, tr_func):
