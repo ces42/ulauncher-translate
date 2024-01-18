@@ -8,6 +8,7 @@ from ulauncher.api.shared.item.ExtensionResultItem import ExtensionResultItem
 from ulauncher.api.shared.action.RenderResultListAction import RenderResultListAction
 from ulauncher.api.shared.action.HideWindowAction import HideWindowAction
 from ulauncher.api.shared.action.CopyToClipboardAction import CopyToClipboardAction
+from ulauncher.api.shared.action.OpenUrlAction import OpenUrlAction
 import textwrap
 import sys
 import re
@@ -138,7 +139,8 @@ class KeywordQueryEventListener(EventListener):
                 ExtensionResultItem(icon='images/icon.png',
                                     name=format_query(query, orig, to),
                                     description=res_text,
-                                    on_enter=CopyToClipboardAction(result))
+                                    on_enter=OpenUrlAction(f'https://translate.google.com/?sl={orig}&tl={to}&text={query}&op=translate'),
+                                    on_alt_enter=CopyToClipboardAction(result))
             )
 
         return RenderResultListAction(items)
