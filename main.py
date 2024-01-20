@@ -16,7 +16,7 @@ from googletrans import Translator
 import asyncio
 
 AGENT =  "Mozilla/5.0 (Android 9; Mobile; rv:67.0.3) Gecko/67.0.3 Firefox/67.0.3"
-LANG_RE = '([a-zA-Z-]{2,})?:([a-zA-Z]{2})?' 
+LANG_RE = r'([a-zA-Z-]{2,})?:([a-zA-Z]{2})?' 
 
 FLAGS = {'en': '🇺🇸', 'de': '🇩🇪', 'es': '🇪🇸', 'zh-cn': '🇨🇳', 'fr': '🇫🇷', 'it': '🇮🇹'}
 
@@ -136,11 +136,13 @@ class KeywordQueryEventListener(EventListener):
                 res_text = '\n'.join(textwrap.wrap(result, wrap_len))
             
             items.append(
-                ExtensionResultItem(icon='images/icon.png',
-                                    name=format_query(query, orig, to),
-                                    description=res_text,
-                                    on_enter=OpenUrlAction(f'https://translate.google.com/?sl={orig}&tl={to}&text={query}&op=translate'),
-                                    on_alt_enter=CopyToClipboardAction(result))
+                ExtensionResultItem(
+                    icon='images/icon.png',
+                    name=format_query(query, orig, to),
+                    description=res_text,
+                    on_enter=OpenUrlAction(f'https://translate.google.com/?sl={orig}&tl={to}&text={query}&op=translate'),
+                    on_alt_enter=CopyToClipboardAction(result)
+                )
             )
 
         return RenderResultListAction(items)
